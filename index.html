@@ -1,0 +1,436 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>Love Letter</title>
+<style>
+  :root { font: 16px/1.5 system-ui, sans-serif; color: #202020; background: #fff; --muted: #656565; --line: #d5d5d5; }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body { margin: 0; }
+  main { max-width: 48rem; margin: 0 auto; padding: 3rem 1.5rem; }
+  header, .row, .actions { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+  header { border-bottom: 1px solid var(--line); padding-bottom: 1.5rem; margin-bottom: 2.5rem; }
+  h1 { font-size: 1.5rem; letter-spacing: -.03em; margin: 0; font-weight: 650; }
+  h2 { font-size: 1.5rem; letter-spacing: -.02em; line-height: 1.25; margin: 0 0 .75rem; font-weight: 600; }
+  h3 { font-size: 1rem; margin: 0; }
+  p { margin: 0 0 1rem; }
+  .muted, small { color: var(--muted); }
+  small { font-size: .875rem; }
+  button, input, select { font: inherit; color: inherit; border: 1px solid #999; background: #fff; border-radius: 4px; min-height: 44px; padding: .625rem .875rem; max-width: 100%; }
+  button, summary { cursor: pointer; }
+  button:hover:not(:disabled) { background: #f1f1f1; border-color: #202020; }
+  button.primary { background: #202020; color: #fff; border-color: #202020; }
+  button.primary:hover:not(:disabled) { background: #404040; }
+  button:disabled { cursor: default; color: #777; background: #f5f5f5; border-color: var(--line); }
+  :focus-visible { outline: 2px solid #202020; outline-offset: 4px; }
+  ::selection { background: #202020; color: #fff; }
+  input { caret-color: #202020; }
+  input::placeholder { color: var(--muted); }
+  a { color: inherit; text-underline-offset: .2em; }
+  fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+  label, legend { display: block; font-size: .875rem; margin-bottom: .5rem; }
+  .setup { max-width: 25rem; padding: .5rem 0 1rem; }
+  .setup > button { width: 100%; }
+  .join { display: flex; align-items: flex-end; gap: .75rem; margin-top: 1.5rem; }
+  .join label { flex: 1; min-width: 0; margin: 0; }
+  .join input { display: block; width: 100%; margin-top: .5rem; text-transform: uppercase; letter-spacing: .1em; }
+  #room { font-variant-numeric: tabular-nums; letter-spacing: .1em; color: #202020; }
+  #connection:empty { display: none; }
+  #error { border: 1px solid #202020; padding: .875rem 1rem; margin-bottom: 1.5rem; }
+  section { margin-bottom: 2.5rem; }
+  #turn { scroll-margin-top: 1.5rem; }
+  .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 1.25rem 0; }
+  .card { position: relative; display: flex; flex-direction: column; align-items: flex-start; text-align: left; border: 1px solid #999; border-radius: 6px; padding: 1.25rem; min-height: 15rem; background: white; }
+  .card:disabled { color: #202020; background: #fff; }
+  .card[aria-pressed="true"] { border: 2px solid #202020; padding: calc(1.25rem - 1px); background: #f4f4f4; }
+  .card .value { font-size: 2.75rem; line-height: 1; font-weight: 500; font-variant-numeric: tabular-nums; margin: 1.25rem 0 .5rem; }
+  .card strong { font-size: 1.125rem; font-weight: 600; }
+  .card .effect { font-size: .875rem; line-height: 1.5; color: #555; margin-top: .5rem; }
+  .card .slot { font-size: .75rem; color: var(--muted); }
+  .card[aria-pressed="true"] .slot { color: #202020; font-weight: 600; }
+  #play-options { display: flex; flex-wrap: wrap; gap: 1rem; margin: 1.25rem 0; }
+  #play-options label { flex: 1; min-width: 10rem; margin: 0; }
+  #play-options select { display: block; width: 100%; margin-top: .5rem; }
+  .actions { justify-content: flex-start; }
+  .actions p { margin: 0; font-size: .875rem; }
+  #private { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 1rem 0; margin: 1.5rem 0; }
+  #private p { margin: .5rem 0 0; }
+  .text-button { border: 0; padding: .5rem 0; text-decoration: underline; text-underline-offset: .2em; background: transparent; font-size: .875rem; }
+  #players { list-style: none; padding: 0; margin: 1rem 0 0; }
+  #players li { padding: .875rem 0; border-top: 1px solid var(--line); }
+  #players p { font-size: .875rem; margin: .25rem 0 0; overflow-wrap: anywhere; }
+  .score { font-size: .875rem; font-variant-numeric: tabular-nums; }
+  details { border-top: 1px solid var(--line); }
+  summary { padding: .875rem 0; min-height: 44px; font-size: .875rem; }
+  details p, details ol, details dl { font-size: .875rem; }
+  details .setup { padding-bottom: 1.5rem; }
+  dt { font-weight: 600; margin-top: .875rem; }
+  dd { margin: .125rem 0 0; color: #555; }
+  #history { padding-left: 1.25rem; max-height: 18rem; overflow: auto; scrollbar-color: #999 #f5f5f5; }
+  #history li { padding: .25rem 0; }
+  #bottom-order { margin: 0; font-size: .875rem; }
+  #result-hands { padding-left: 1.25rem; }
+  footer { margin-top: 2.5rem; }
+  @media (max-width: 480px) {
+    main { padding: 1.5rem 1rem; }
+    header { margin-bottom: 2rem; }
+    .cards { gap: .75rem; }
+    .card { padding: .875rem; min-height: 15rem; }
+    .card[aria-pressed="true"] { padding: calc(.875rem - 1px); }
+    #chancellor-cards { grid-template-columns: 1fr; }
+    #chancellor-cards .card { min-height: 0; }
+    #chancellor-cards .value { margin-top: .5rem; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Love Letter</h1>
+    <small id="room-label" hidden>Room <strong id="room"></strong></small>
+  </header>
+  <p id="connection" role="status" class="muted">Connecting…</p>
+  <p id="error" role="alert" hidden></p>
+  <section id="entry">
+    <p class="muted">A game of deduction for 2–20 players.</p>
+    <div id="setup" class="setup">
+      <button id="create" class="primary" type="button" disabled>Create Room</button>
+      <form id="join-form" class="join">
+        <label for="room-code">Or join with a room code
+          <input id="room-code" maxlength="6" required pattern="[A-HJ-NP-Z2-9]{6}" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC234" disabled>
+        </label>
+        <button id="join" type="submit" disabled>Join Room</button>
+      </form>
+    </div>
+  </section>
+  <section id="lobby" hidden>
+    <h2>Ready when you are.</h2>
+    <p class="muted">Share the room code. Start once everyone has joined.</p>
+    <div class="actions"><button id="start" class="primary" type="button">Start Round</button><p class="muted">2–20 players</p></div>
+  </section>
+  <section id="game" hidden>
+    <div class="row"><h2 id="turn" role="status" tabindex="-1"></h2><small id="remaining"></small></div>
+    <p id="turn-help" class="muted"></p>
+    <div id="private" hidden>
+      <div class="row"><h3>Private reveal</h3><button id="dismiss-reveal" class="text-button" type="button">Dismiss</button></div>
+      <p id="reveal" role="status"></p>
+    </div>
+    <form id="play-form" hidden>
+      <fieldset><legend>Your cards</legend><div id="hand" class="cards"></div></fieldset>
+      <div id="play-options">
+        <label id="target-label" hidden>Choose a player<select id="target" required></select></label>
+        <label id="guess-label" hidden>Guess their card<select id="guess" required></select></label>
+      </div>
+      <div class="actions"><button id="play" class="primary" type="submit">Play Card</button><p id="play-hint" class="muted"></p></div>
+    </form>
+    <div id="waiting-hand" class="cards" hidden></div>
+    <form id="chancellor-form" hidden>
+      <fieldset><legend>Choose one card to keep</legend><div id="chancellor-cards" class="cards"></div></fieldset>
+      <p id="bottom-order"></p>
+      <div class="actions"><button id="reverse" class="text-button" type="button" hidden>Reverse return order</button></div>
+      <button id="keep" class="primary" type="submit">Keep Card</button>
+    </form>
+  </section>
+  <section id="result" hidden>
+    <h2 id="result-title" tabindex="-1">Round finished</h2>
+    <p id="result-reason" class="muted"></p>
+    <ul id="result-hands"></ul>
+    <button id="next" class="primary" type="button">Next Round</button>
+  </section>
+  <section id="table" hidden>
+    <h3>At the table</h3>
+    <ul id="players"></ul>
+  </section>
+  <footer>
+    <details id="rules">
+      <summary>How to play</summary>
+      <p>On your turn, play one of your two cards and keep the other. Resolve its effect, then the next player draws. Survive with the highest card when the deck runs out, or be the last player standing. Tied players each win a favor.</p>
+      <p>Targets must be active and unprotected, except Prince can always target yourself. If no opponent is eligible, Guard, Priest, Baron, and King have no effect. Prince must still target yourself.</p>
+      <dl id="card-rules"></dl>
+      <p>Winners earn one favor. The only surviving player who played or discarded a Spy earns one extra favor. Scores carry into the next round while you stay in the room; there is no match-winning threshold.</p>
+      <p>This version uses all 21 cards, with no reserved card. If a Prince needs a replacement after the deck is empty, that player keeps no card and the round ends. New arrivals watch until the next round.</p>
+    </details>
+    <details id="activity" hidden><summary>Recent actions</summary><ol id="history"></ol></details>
+    <details id="switch-room" hidden>
+      <summary>Change room</summary>
+      <p>Joining another room leaves this one and clears your favors. During a round, it also gives up your hand.</p>
+      <div id="switch-setup"></div>
+    </details>
+  </footer>
+</main>
+<script id="game-logic">
+  const cards = [
+    ['Spy', 'At round end, earn a bonus favor if you are the only survivor who played or discarded a Spy.', 2],
+    ['Guard', 'Guess another player’s card. A correct guess eliminates them. You cannot guess Guard.', 6],
+    ['Priest', 'Privately see another player’s card.', 2],
+    ['Baron', 'Compare retained cards with another player. The lower card is eliminated; ties survive.', 2],
+    ['Handmaid', 'You cannot be targeted by other players until your next turn.', 2],
+    ['Prince', 'Choose any eligible player, including yourself, to discard their hand and draw again.', 2],
+    ['Chancellor', 'Draw up to two cards. Keep one and return the others to the bottom in your chosen order.', 2],
+    ['King', 'Swap retained cards with another player.', 1],
+    ['Countess', 'You must play this when also holding a Prince or King. Otherwise, it has no effect.', 1],
+    ['Princess', 'If you play or discard this card, you are eliminated.', 1]
+  ];
+  const cardName = value => value == null ? 'No card' : `${value} · ${cards[value][0]}`;
+  const playerName = (id, self) => id === self ? 'You' : `Player ${id}`;
+  const freshRound = () => ({ game: null, hand: { held: null, drawn: null }, candidates: [], choice: null, keep: null, bottom: [], result: null, reveal: null, history: [], roundStarting: false });
+  const newModel = () => ({ ...freshRound(), clientId: '', room: '', connected: false, pending: null, buffered: null, error: '' });
+  function legalTargets(game, self, card) {
+    if (![1, 2, 3, 5, 7].includes(card) || !game) return [];
+    return game.players.filter(id => id === self ? card === 5 : !game.protected.includes(id));
+  }
+  function forcedChoice(hand) {
+    if ([hand.held, hand.drawn].includes(8) && [hand.held, hand.drawn].some(value => value === 5 || value === 7))
+      return hand.held === 8 ? 'held' : 'drawn';
+    return null;
+  }
+  function chooseKeep(model, index) {
+    model.keep = index;
+    model.bottom = model.candidates.map((_, i) => i).filter(i => i !== index);
+  }
+  function receive(model, message) {
+    if (message.type === 'welcome') model.clientId = message.clientId;
+    if (message.type === 'error') {
+      model.error = message.message;
+      model.pending = null;
+      model.buffered = null;
+      return;
+    }
+    if (message.type === 'room_joined') {
+      const buffered = model.buffered;
+      if (model.room !== message.room) Object.assign(model, freshRound(), { room: message.room });
+      model.pending = null;
+      model.buffered = null;
+      model.error = '';
+      if (buffered?.room === message.room) receive(model, buffered);
+      return;
+    }
+    if (message.room && message.room !== model.room) {
+      if (message.type === 'game_state') model.buffered = message;
+      return;
+    }
+    if (message.type === 'hand') {
+      if (model.game?.status !== 'active' && !model.roundStarting) Object.assign(model, freshRound(), { roundStarting: true });
+      model.hand = { held: message.held, drawn: message.drawn };
+    }
+    if (message.type === 'game_state') {
+      if (message.status === 'active' && model.game?.status !== 'active' && !model.roundStarting) Object.assign(model, freshRound());
+      model.roundStarting = false;
+      model.game = message;
+      if (!['join_room', 'create_room'].includes(model.pending?.type)) model.pending = null;
+      if (message.phase !== 'chancellor' || message.status !== 'active') {
+        model.candidates = [];
+        model.keep = null;
+        model.bottom = [];
+      }
+      model.choice = null;
+      if (message.status === 'finished') model.hand.drawn = null;
+    }
+    if (message.type === 'chancellor_choice') {
+      model.candidates = message.cards;
+      model.choice = null;
+      model.keep = null;
+      model.bottom = [];
+    }
+    if (message.type === 'cards_revealed') model.reveal = message;
+    if (message.type === 'game_over') { model.result = message; model.reveal = null; }
+    const who = id => playerName(id, model.clientId);
+    let line = '';
+    if (message.type === 'card_played') line = `${who(message.player)} played ${cardName(message.card)}${message.target ? ` → ${who(message.target)}` : ''}${message.guess != null ? `, guessing ${cardName(message.guess)}` : ''}.`;
+    if (message.type === 'card_discarded' && message.reason !== 'played') line = `${who(message.player)} discarded ${cardName(message.card)}.`;
+    if (message.type === 'player_eliminated') line = `${who(message.player)} ${message.reason === 'left' ? 'left the round' : 'was eliminated'}.`;
+    if (line) model.history = [line, ...model.history].slice(0, 30);
+  }
+</script>
+<script>
+  const element = id => document.getElementById(id);
+  const model = newModel();
+  const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`);
+  const who = id => playerName(id, model.clientId);
+  const show = (id, visible) => { element(id).hidden = !visible; };
+  const text = (id, value) => { element(id).textContent = value; };
+  function node(tag, content, className) {
+    const result = document.createElement(tag);
+    result.textContent = content;
+    if (className) result.className = className;
+    return result;
+  }
+  function sendToServer(type, fields = {}) {
+    if (socket.readyState !== WebSocket.OPEN) return false;
+    socket.send(JSON.stringify({ ...fields, type }));
+    return true;
+  }
+  function broadcastToRoom(data) { return sendToServer('broadcast', { data }); }
+  function request(type, fields = {}) {
+    if (model.pending || !model.connected) return;
+    if (!sendToServer(type, fields)) return disconnected();
+    model.pending = { type, ...fields };
+    model.error = '';
+    render();
+  }
+  const action = (name, fields = {}) => request('server_message', { data: { action: name, ...fields } });
+  function cardButton(value, slot, selected, disabled, onClick) {
+    const button = node('button', '', 'card');
+    button.type = 'button';
+    button.disabled = disabled;
+    button.setAttribute('aria-pressed', String(selected));
+    button.append(node('span', `${slot}${selected ? ' · Selected' : ''}`, 'slot'), node('span', String(value), 'value'), node('strong', cards[value][0]), node('span', cards[value][1], 'effect'));
+    button.addEventListener('click', onClick);
+    return button;
+  }
+  function fillSelect(id, choices, placeholder) {
+    const select = element(id);
+    const previous = select.value;
+    select.replaceChildren(new Option(placeholder, ''), ...choices.map(([value, label]) => new Option(label, value)));
+    select.value = choices.some(([value]) => String(value) === previous) ? previous : choices.length === 1 ? String(choices[0][0]) : '';
+  }
+  function renderPlay() {
+    const locked = !model.connected || !!model.pending;
+    const forced = forcedChoice(model.hand);
+    if (forced) model.choice = forced;
+    element('hand').replaceChildren(...['held', 'drawn'].filter(slot => model.hand[slot] != null).map(slot => {
+      const button = cardButton(model.hand[slot], slot === 'held' ? 'In hand' : 'Just drawn', model.choice === slot, locked || (!!forced && forced !== slot), () => {
+        model.choice = slot;
+        element('target').value = '';
+        element('guess').value = '';
+        renderPlay();
+        element('hand').querySelector(`[data-choice="${slot}"]`).focus();
+      });
+      button.dataset.choice = slot;
+      return button;
+    }));
+    const selected = model.choice ? model.hand[model.choice] : null;
+    const targets = legalTargets(model.game, model.clientId, selected);
+    show('target-label', targets.length > 0);
+    show('guess-label', selected === 1 && targets.length > 0);
+    fillSelect('target', targets.map(id => [id, who(id)]), 'Select player');
+    fillSelect('guess', cards.flatMap((card, value) => value === 1 ? [] : [[value, cardName(value)]]), 'Select card');
+    element('target').disabled = locked || targets.length === 0;
+    element('guess').disabled = locked || selected !== 1 || targets.length === 0;
+    text('play-hint', forced ? 'You must play the Countess.' : selected === 9 ? 'Playing Princess eliminates you.' : selected != null && [1, 2, 3, 7].includes(selected) && !targets.length ? 'No eligible target. Play without an effect.' : selected == null ? 'Choose one card to play.' : 'The other card stays in your hand.');
+    element('play').disabled = locked || selected == null || (targets.length > 0 && !element('target').value) || (selected === 1 && targets.length > 0 && element('guess').value === '');
+    text('play', model.pending ? 'Playing…' : 'Play Card');
+  }
+  function renderChancellor() {
+    const locked = !model.connected || !!model.pending;
+    element('chancellor-cards').replaceChildren(...model.candidates.map((value, index) => {
+      const button = cardButton(value, `Card ${index + 1}${index === 0 ? ' · In hand' : ''}`, model.keep === index, locked, () => {
+        chooseKeep(model, index);
+        renderChancellor();
+        element('chancellor-cards').children[index].focus();
+      });
+      return button;
+    }));
+    text('bottom-order', model.keep == null ? 'Select the card you want to keep.' : `Return to the bottom, first drawn to last: ${model.bottom.map(i => `Card ${i + 1} (${cardName(model.candidates[i])})`).join(' → ')}.`);
+    show('reverse', model.bottom.length > 1);
+    element('reverse').disabled = locked;
+    element('keep').disabled = locked || model.keep == null;
+    text('keep', model.pending ? 'Keeping…' : 'Keep Card');
+  }
+  function render() {
+    const game = model.game;
+    const active = game?.status === 'active';
+    const playing = active && game.currentPlayer === model.clientId;
+    const chancellor = playing && game.phase === 'chancellor';
+    const locked = !model.connected || !!model.pending;
+    text('error', model.error);
+    show('error', !!model.error);
+    show('room-label', !!model.room);
+    text('room', model.room);
+    show('entry', !model.room);
+    show('lobby', !!model.room && !game && !model.roundStarting);
+    show('switch-room', !!model.room);
+    const setupParent = element(model.room ? 'switch-setup' : 'entry');
+    if (element('setup').parentElement !== setupParent) setupParent.append(element('setup'));
+    for (const id of ['create', 'join', 'room-code', 'start', 'next']) element(id).disabled = locked;
+    text('create', model.pending?.type === 'create_room' ? 'Creating…' : 'Create Room');
+    text('join', model.pending?.type === 'join_room' ? 'Joining…' : 'Join Room');
+    text('start', model.pending?.data?.action === 'start_game' ? 'Starting…' : 'Start Round');
+    text('next', model.pending?.data?.action === 'start_game' ? 'Starting…' : 'Next Round');
+    show('game', active);
+    show('play-form', playing && !chancellor);
+    show('chancellor-form', chancellor);
+    show('waiting-hand', active && !playing && model.hand.held != null);
+    if (!active) for (const id of ['hand', 'waiting-hand', 'chancellor-cards']) element(id).replaceChildren();
+    if (active) {
+      const eliminated = !game.players.includes(model.clientId) && Object.hasOwn(game.discards, model.clientId);
+      text('turn', playing ? (chancellor ? 'Keep one card.' : 'Your turn.') : eliminated ? 'You’re out this round.' : !game.players.includes(model.clientId) ? 'You’re watching.' : `${who(game.currentPlayer)}’s turn.`);
+      text('turn-help', playing ? (chancellor ? 'Return the others to the bottom of the deck.' : 'Choose a card to play. Keep the other secret.') : !game.players.includes(model.clientId) ? 'You’ll join the next round.' : game.phase === 'chancellor' ? 'Waiting for their Chancellor choice.' : 'Your card stays private while you wait.');
+      text('remaining', `${game.cardsRemaining} ${game.cardsRemaining === 1 ? 'card' : 'cards'} left`);
+      if (playing && !chancellor) renderPlay();
+      if (chancellor) renderChancellor();
+      element('waiting-hand').replaceChildren(...(model.hand.held == null ? [] : [cardButton(model.hand.held, 'Your card', false, true, () => {})]));
+    }
+    show('private', !!model.reveal && active);
+    if (!model.reveal) text('reveal', '');
+    if (model.reveal) text('reveal', `${cards[model.reveal.card][0]} revealed: ${Object.entries(model.reveal.hands).map(([id, value]) => `${who(id)} — ${cardName(value)}`).join('; ')}. Cards may have changed since this reveal.`);
+    show('result', game?.status === 'finished');
+    if (!model.result) element('result-hands').replaceChildren();
+    if (game?.status === 'finished') {
+      const result = model.result;
+      text('result-title', !result ? 'Round finished.' : result.winners.length === 0 ? 'No winner this round.' : result.winners.length === 1 ? `${who(result.winners[0])} ${result.winners[0] === model.clientId ? 'win' : 'wins'}.` : `${result.winners.map(who).join(' and ')} tie.`);
+      text('result-reason', !result ? 'Join the next round to play.' : result.reason === 'deck_empty' ? 'The deck is empty. Highest surviving card wins.' : 'The round ended with fewer than two players standing.');
+      element('result-hands').replaceChildren(...Object.entries(result?.hands ?? {}).map(([id, value]) => node('li', `${who(id)} — ${cardName(value)}`)));
+    }
+    show('table', !!game);
+    if (game) {
+      const members = [...new Set([...game.players, ...Object.keys(game.favors), ...Object.keys(game.discards)])];
+      element('players').replaceChildren(...members.map(id => {
+        const li = node('li', '');
+        const row = node('div', '', 'row');
+        const status = !Object.hasOwn(game.favors, id) ? 'Left' : !game.players.includes(id) ? Object.hasOwn(game.discards, id) ? 'Out' : 'Watching' : active && game.currentPlayer === id ? 'Their turn' : '';
+        row.append(node('strong', `${who(id)}${status ? ` · ${id === model.clientId && status === 'Their turn' ? 'Your turn' : status}` : ''}${game.protected.includes(id) ? ' · Protected' : ''}`));
+        const award = model.result?.awards[id];
+        row.append(node('span', Object.hasOwn(game.favors, id) ? `${game.favors[id]} ${game.favors[id] === 1 ? 'favor' : 'favors'}${award ? ` (+${award})` : ''}` : '', 'score'));
+        li.append(row, node('p', game.discards[id]?.length ? `Played / discarded: ${game.discards[id].map(cardName).join(', ')}` : 'No cards played.', 'muted'));
+        return li;
+      }));
+    }
+    show('activity', !!model.room);
+    element('history').replaceChildren(...(model.history.length ? model.history : ['No actions yet.']).map(line => node('li', line)));
+  }
+  socket.addEventListener('open', () => { model.connected = true; text('connection', ''); render(); });
+  socket.addEventListener('message', event => {
+    const previousRoom = model.room;
+    const previousTurn = model.game?.currentPlayer;
+    const previousStatus = model.game?.status;
+    try { receive(model, JSON.parse(event.data)); }
+    catch { model.error = 'Could not read the game update. Refresh to reconnect.'; model.connected = false; socket.close(); }
+    render();
+    if (model.room !== previousRoom) { element('switch-room').open = false; element('room-code').value = ''; }
+    if (model.game?.status === 'finished' && previousStatus !== 'finished') element('result-title').focus();
+    else if (model.game?.currentPlayer === model.clientId && previousTurn !== model.clientId) element('turn').focus();
+  });
+  function disconnected() {
+    model.connected = false;
+    model.pending = null;
+    Object.assign(model, freshRound());
+    text('connection', 'Disconnected. Refresh to reconnect as a new player.');
+    render();
+  }
+  socket.addEventListener('error', disconnected);
+  socket.addEventListener('close', disconnected);
+  element('create').addEventListener('click', () => request('create_room'));
+  element('room-code').addEventListener('input', event => { event.target.value = event.target.value.toUpperCase(); });
+  element('join-form').addEventListener('submit', event => { event.preventDefault(); request('join_room', { room: element('room-code').value }); });
+  for (const id of ['start', 'next']) element(id).addEventListener('click', () => action('start_game'));
+  for (const id of ['target', 'guess']) element(id).addEventListener('change', renderPlay);
+  element('play-form').addEventListener('submit', event => {
+    event.preventDefault();
+    if (element('play').disabled) return;
+    const fields = { choice: model.choice };
+    if (!element('target').disabled) fields.target = element('target').value;
+    if (!element('guess').disabled) fields.guess = Number(element('guess').value);
+    action('play_card', fields);
+  });
+  element('reverse').addEventListener('click', () => { model.bottom.reverse(); renderChancellor(); });
+  element('chancellor-form').addEventListener('submit', event => { event.preventDefault(); if (!element('keep').disabled) action('resolve_chancellor', { keep: model.keep, bottom: model.bottom }); });
+  element('dismiss-reveal').addEventListener('click', () => { model.reveal = null; show('private', false); });
+  element('card-rules').replaceChildren(...cards.flatMap(([name, effect, count], value) => [node('dt', `${value} · ${name} (${count})`), node('dd', effect)]));
+  render();
+</script>
+</body>
+</html>

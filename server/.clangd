@@ -1,0 +1,6 @@
+CompileFlags:
+  Add: [
+    "-std=c++17",
+    "-I.",
+    "-I/opt/homebrew/opt/asio/include"
+  ]

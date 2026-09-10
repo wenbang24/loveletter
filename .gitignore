@@ -1,0 +1,5 @@
+server/crow
+server/out
+server/room_tests
+*.md
+.impeccable/
