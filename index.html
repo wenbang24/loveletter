@@ -24,7 +24,7 @@
   button:hover:not(:disabled) { background: #f1f1f1; border-color: #202020; }
   button.primary { background: #202020; color: #fff; border-color: #202020; }
   button.primary:hover:not(:disabled) { background: #404040; }
-  button:disabled { cursor: default; color: #777; background: #f5f5f5; border-color: var(--line); }
+  button:disabled { cursor: default; color: var(--muted); background: #f5f5f5; border-color: var(--line); }
   :focus-visible { outline: 2px solid #202020; outline-offset: 4px; }
   ::selection { background: #202020; color: #fff; }
   input { caret-color: #202020; }
@@ -176,7 +176,7 @@
   ];
   const cardName = value => value == null ? 'No card' : `${value} · ${cards[value][0]}`;
   const playerName = (id, self) => id === self ? 'You' : `Player ${id}`;
-  const freshRound = () => ({ game: null, hand: { held: null, drawn: null }, candidates: [], choice: null, keep: null, bottom: [], result: null, reveal: null, history: [], roundStarting: false });
+  const freshRound = () => ({ game: null, hand: { held: null, drawn: null }, candidates: [], choice: null, keep: null, bottom: [], result: null, reveal: null, history: [], historyOpen: false, roundStarting: false });
   const newModel = () => ({ ...freshRound(), clientId: '', room: '', connected: false, pending: null, buffered: null, error: '' });
   function legalTargets(game, self, card) {
     if (![1, 2, 3, 5, 7].includes(card) || !game) return [];
@@ -220,6 +220,7 @@
       if (message.status === 'active' && model.game?.status !== 'active' && !model.roundStarting) Object.assign(model, freshRound());
       model.roundStarting = false;
       model.game = message;
+      model.historyOpen = false;
       if (!['join_room', 'create_room'].includes(model.pending?.type)) model.pending = null;
       if (message.phase !== 'chancellor' || message.status !== 'active') {
         model.candidates = [];
@@ -242,7 +243,11 @@
     if (message.type === 'card_played') line = `${who(message.player)} played ${cardName(message.card)}${message.target ? ` → ${who(message.target)}` : ''}${message.guess != null ? `, guessing ${cardName(message.guess)}` : ''}.`;
     if (message.type === 'card_discarded' && message.reason !== 'played') line = `${who(message.player)} discarded ${cardName(message.card)}.`;
     if (message.type === 'player_eliminated') line = `${who(message.player)} ${message.reason === 'left' ? 'left the round' : 'was eliminated'}.`;
-    if (line) model.history = [line, ...model.history].slice(0, 30);
+    if (line) {
+      if (model.historyOpen && message.type !== 'card_played') model.history[0] += ` ${line}`;
+      else model.history = [line, ...model.history].slice(0, 30);
+      model.historyOpen = true;
+    }
   }
 </script>
 <script>

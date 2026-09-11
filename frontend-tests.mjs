@@ -38,6 +38,37 @@ assert.deepEqual(plain(model.bottom), [2, 0]);
 api.receive(model, { ...state, currentPlayer: '2' });
 assert.deepEqual(plain(model.candidates), []);
 
+const event = (type, fields = {}) => api.receive(model, { type, room: model.room, ...fields });
+event('card_played', { player: '2', card: 5, target: '1' });
+event('card_discarded', { player: '2', card: 5, reason: 'played' });
+event('card_discarded', { player: '1', card: 9, reason: 'prince' });
+event('player_eliminated', { player: '1', reason: 'princess' });
+assert.deepEqual(plain(model.history), [
+  'Player 2 played 5 · Prince → You. You discarded 9 · Princess. You was eliminated.'
+]);
+api.receive(model, { ...state, currentPlayer: '3' });
+event('card_played', { player: '3', card: 6 });
+event('card_discarded', { player: '3', card: 6, reason: 'played' });
+api.receive(model, { ...state, currentPlayer: '3', phase: 'chancellor' });
+event('chancellor_choice', { cards: [1, 2, 3] });
+event('error', { message: 'Try again.' });
+event('hand', { held: 1, drawn: null });
+api.receive(model, { ...state, currentPlayer: '2' });
+assert.equal(model.history.length, 2); // Chancellor resolution adds no second entry.
+event('card_discarded', { player: '2', card: 0, reason: 'left' });
+event('card_discarded', { player: '2', card: 4, reason: 'left' });
+event('player_eliminated', { player: '2', reason: 'left' });
+assert.equal(model.history.length, 3);
+assert.equal(model.history[0], 'Player 2 discarded 0 · Spy. Player 2 discarded 4 · Handmaid. Player 2 left the round.');
+assert.equal(model.history[1], 'Player 3 played 6 · Chancellor.');
+api.receive(model, state);
+for (let i = 0; i < 31; i++) {
+  event('card_played', { player: '2', card: 0 });
+  api.receive(model, state);
+}
+assert.equal(model.history.length, 30);
+event('hand', { held: 0, drawn: 6 });
+
 api.receive(model, { type: 'cards_revealed', room: state.room, card: 2, hands: { 2: 9 } });
 model.pending = { type: 'join_room', room: 'DEF234' };
 api.receive(model, { type: 'error', message: 'Room not found.' });

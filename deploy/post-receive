@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+while read -r old new ref; do
+    [[ "$ref" == refs/heads/main && "$new" != 0000000000000000000000000000000000000000 ]] || continue
+    repo=$(git rev-parse --absolute-git-dir)
+    exec 9>"$repo/build.lock"
+    flock 9
+    exec > >(tee "$repo/build.log") 2>&1
+    work_tree="$HOME/loveletter"
+    git --git-dir="$repo" --work-tree="$work_tree" checkout -f main
+    cd "$work_tree"
+    output=$(mktemp "$work_tree/server/out.XXXXXX")
+    trap 'rm -f "$output"' EXIT
+    echo "Building $(git --git-dir="$repo" rev-parse main)…"
+    if c++ -std=c++17 -Wall -Wextra -pedantic -DCROW_ENFORCE_WS_SPEC \
+        -Iserver -I"$HOME/loveletter-deps" \
+        server/main.cpp server/server.cpp server/room.cpp -pthread -o "$output"; then
+        chmod +x "$output"
+        mv -f "$output" server/out
+        echo "Build succeeded: $work_tree/server/out"
+        if systemctl is-enabled --quiet loveletter.service; then
+            install -m 755 server/out /srv/loveletter/out.new
+            mv -f /srv/loveletter/out.new /srv/loveletter/out
+            install -m 644 index.html /srv/loveletter/index.html
+            systemctl restart loveletter.service
+            systemctl is-active --quiet loveletter.service
+            echo "Love Letter restarted."
+        fi
+    else
+        echo "BUILD FAILED: Git accepted the push; the previous executable is unchanged."
+        exit 1
+    fi
+done
