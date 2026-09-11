@@ -42,6 +42,8 @@
   #error { border: 1px solid #202020; padding: .875rem 1rem; margin-bottom: 1.5rem; }
   section { margin-bottom: 2.5rem; }
   #turn { scroll-margin-top: 1.5rem; }
+  #latest-action { background: #f4f4f4; border-left: 4px solid #202020; padding: 1rem 1.25rem; }
+  #latest-action p { margin: .5rem 0 0; font-size: 1.125rem; overflow-wrap: anywhere; }
   .cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin: 1.25rem 0; }
   .card { position: relative; display: flex; flex-direction: column; align-items: flex-start; text-align: left; border: 1px solid #999; border-radius: 6px; padding: 1.25rem; min-height: 15rem; background: white; }
   .card:disabled { color: #202020; background: #fff; }
@@ -110,6 +112,10 @@
     <h2>Ready when you are.</h2>
     <p class="muted">Share the room code. Start once everyone has joined.</p>
     <div class="actions"><button id="start" class="primary" type="button">Start Round</button><p class="muted">2–20 players</p></div>
+  </section>
+  <section id="latest-action" aria-labelledby="latest-action-title" hidden>
+    <h3 id="latest-action-title">Latest action</h3>
+    <p id="latest-action-text" role="status" aria-atomic="true"></p>
   </section>
   <section id="game" hidden>
     <div class="row"><h2 id="turn" role="status" tabindex="-1"></h2><small id="remaining"></small></div>
@@ -395,6 +401,9 @@
       }));
     }
     show('activity', !!model.room);
+    const latestAction = model.history[0] ?? '';
+    show('latest-action', !!latestAction);
+    if (element('latest-action-text').textContent !== latestAction) text('latest-action-text', latestAction);
     element('history').replaceChildren(...(model.history.length ? model.history : ['No actions yet.']).map(line => node('li', line)));
   }
   socket.addEventListener('open', () => { model.connected = true; text('connection', ''); render(); });

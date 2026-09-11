@@ -69,7 +69,9 @@ for (let i = 0; i < 31; i++) {
 assert.equal(model.history.length, 30);
 event('hand', { held: 0, drawn: 6 });
 
+const publicHistory = plain(model.history);
 api.receive(model, { type: 'cards_revealed', room: state.room, card: 2, hands: { 2: 9 } });
+assert.deepEqual(plain(model.history), publicHistory); // Latest action must never contain private reveals.
 model.pending = { type: 'join_room', room: 'DEF234' };
 api.receive(model, { type: 'error', message: 'Room not found.' });
 assert.equal(model.room, state.room);
@@ -82,6 +84,7 @@ api.receive(model, { type: 'room_joined', room: 'DEF234' });
 assert.equal(model.game.room, 'DEF234');
 assert.equal(model.hand.held, null);
 assert.equal(model.reveal, null);
+assert.deepEqual(plain(model.history), []);
 api.receive(model, { type: 'hand', room: state.room, held: 9, drawn: 8 });
 assert.equal(model.hand.held, null); // Ignore old-room secrets.
 
