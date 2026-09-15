@@ -304,6 +304,13 @@ void Room::addClient(const std::string& clientId, Connection& connection) {
     if (members_.emplace(clientId, &connection).second) onJoin(clientId);
 }
 
+void Room::setName(const std::string& clientId, const std::string& name) {
+    names_[clientId] = name.empty() ? "Player " + clientId : name;
+    Json update{{"type", "player_names"}, {"room", code_}, {"names", Json::object{}}};
+    for (const auto& entry : names_) update["names"][entry.first] = entry.second;
+    broadcast(update);
+}
+
 void Room::removeClient(const std::string& clientId) {
     if (members_.erase(clientId)) onLeave(clientId);
 }

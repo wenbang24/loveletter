@@ -42,6 +42,7 @@ class Room {
     const std::string& code() const { return code_; }
     bool               empty() const { return members_.empty(); }
     void               addClient(const std::string& clientId, Connection& connection);
+    void               setName(const std::string& clientId, const std::string& name);
     void               removeClient(const std::string& clientId);
 
     // Application entry point. The incoming data reference is valid only during this call.
@@ -64,6 +65,7 @@ class Room {
     void finishGame(const std::string& reason);
 
     std::string                                  code_;
+    std::unordered_map<std::string, std::string> names_;
     std::unordered_map<std::string, Connection*> members_;
 
     std::vector<std::string>             joinOrder_, players_;

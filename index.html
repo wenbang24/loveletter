@@ -37,6 +37,10 @@
   .join { display: flex; align-items: flex-end; gap: .75rem; margin-top: 1.5rem; }
   .join label { flex: 1; min-width: 0; margin: 0; }
   .join input { display: block; width: 100%; margin-top: .5rem; text-transform: uppercase; letter-spacing: .1em; }
+  .name-field input { display: block; width: 100%; margin-top: .5rem; }
+  .name-field { margin-bottom: 1rem; }
+  #players strong { min-width: 0; }
+  #players strong, #turn, #result-title, #result-hands, #reveal, #history li { overflow-wrap: anywhere; }
   #room { font-variant-numeric: tabular-nums; letter-spacing: .1em; color: #202020; }
   #connection:empty { display: none; }
   #error { border: 1px solid #202020; padding: .875rem 1rem; margin-bottom: 1.5rem; }
@@ -99,6 +103,8 @@
   <section id="entry">
     <p class="muted">A game of deduction for 2–20 players.</p>
     <div id="setup" class="setup">
+      <label id="entry-name-label" class="name-field">Your name (optional)<input id="entry-name" autocomplete="off" placeholder="Player name" aria-describedby="name-help" disabled></label>
+      <p id="name-help" class="muted">Up to 32 characters. Leave blank for a default name.</p>
       <button id="create" class="primary" type="button" disabled>Create Room</button>
       <form id="join-form" class="join">
         <label for="room-code">Or join with a room code
@@ -151,6 +157,15 @@
     <ul id="players"></ul>
   </section>
   <footer>
+    <details id="change-name" hidden>
+      <summary>Change name</summary>
+      <form id="name-form" class="setup">
+        <label class="name-field">Your name<input id="player-name" autocomplete="off" aria-describedby="rename-help"></label>
+        <p id="rename-help" class="muted">Up to 32 characters. Leave blank for a default name.</p>
+        <button id="save-name" type="submit">Save Name</button>
+        <p id="name-status" role="status" class="muted"></p>
+      </form>
+    </details>
     <details id="rules">
       <summary>How to play</summary>
       <p>On your turn, play one of your two cards and keep the other. Resolve its effect, then the next player draws. Survive with the highest card when the deck runs out, or be the last player standing. Tied players each win a favor.</p>
@@ -162,7 +177,6 @@
     <details id="activity" hidden><summary>Recent actions</summary><ol id="history"></ol></details>
     <details id="switch-room" hidden>
       <summary>Change room</summary>
-      <p>Joining another room leaves this one and clears your favors. During a round, it also gives up your hand.</p>
       <div id="switch-setup"></div>
     </details>
   </footer>
@@ -180,10 +194,15 @@
     ['Countess', 'You must play this when also holding a Prince or King. Otherwise, it has no effect.', 1],
     ['Princess', 'If you play or discard this card, you are eliminated.', 1]
   ];
-  const cardName = value => value == null ? 'No card' : `${value} · ${cards[value][0]}`;
-  const playerName = (id, self) => id === self ? 'You' : `Player ${id}`;
+  const cardName = value => value == null ? 'No card' : `${cards[value][0]} (${value})`;
+  const playerName = (id, self, names = {}) => {
+    if (id === self) return 'You';
+    const name = names[id] ?? `Player ${id}`;
+    const duplicate = Object.entries(names).some(([other, value]) => other !== id && value === name);
+    return duplicate ? `${name} (Player ${id})` : name;
+  };
   const freshRound = () => ({ game: null, hand: { held: null, drawn: null }, candidates: [], choice: null, keep: null, bottom: [], result: null, reveal: null, history: [], historyOpen: false, roundStarting: false });
-  const newModel = () => ({ ...freshRound(), clientId: '', room: '', connected: false, pending: null, buffered: null, error: '' });
+  const newModel = () => ({ ...freshRound(), clientId: '', room: '', name: '', names: {}, connected: false, pending: null, buffered: null, error: '' });
   function legalTargets(game, self, card) {
     if (![1, 2, 3, 5, 7].includes(card) || !game) return [];
     return game.players.filter(id => id === self ? card === 5 : !game.protected.includes(id));
@@ -205,9 +224,20 @@
       model.buffered = null;
       return;
     }
+    if (message.type === 'name_updated') {
+      model.name = message.name;
+      if (model.pending?.type === 'set_name') model.pending = null;
+      model.error = '';
+      return;
+    }
+    if (message.type === 'player_names') {
+      if (message.room === model.room) model.names = message.names;
+      return;
+    }
     if (message.type === 'room_joined') {
       const buffered = model.buffered;
-      if (model.room !== message.room) Object.assign(model, freshRound(), { room: message.room });
+      if (model.room !== message.room) Object.assign(model, freshRound(), { room: message.room, names: {} });
+      model.name = message.name ?? model.name;
       model.pending = null;
       model.buffered = null;
       model.error = '';
@@ -244,7 +274,7 @@
     }
     if (message.type === 'cards_revealed') model.reveal = message;
     if (message.type === 'game_over') { model.result = message; model.reveal = null; }
-    const who = id => playerName(id, model.clientId);
+    const who = id => playerName(id, model.clientId, model.names);
     let line = '';
     if (message.type === 'card_played') line = `${who(message.player)} played ${cardName(message.card)}${message.target ? ` → ${who(message.target)}` : ''}${message.guess != null ? `, guessing ${cardName(message.guess)}` : ''}.`;
     if (message.type === 'card_discarded' && message.reason !== 'played') line = `${who(message.player)} discarded ${cardName(message.card)}.`;
@@ -260,7 +290,7 @@
   const element = id => document.getElementById(id);
   const model = newModel();
   const socket = new WebSocket(`${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}/ws`);
-  const who = id => playerName(id, model.clientId);
+  const who = id => playerName(id, model.clientId, model.names);
   const show = (id, visible) => { element(id).hidden = !visible; };
   const text = (id, value) => { element(id).textContent = value; };
   function node(tag, content, className) {
@@ -354,6 +384,11 @@
     show('entry', !model.room);
     show('lobby', !!model.room && !game && !model.roundStarting);
     show('switch-room', !!model.room);
+    show('change-name', !!model.room);
+    show('entry-name-label', !model.room);
+    show('name-help', !model.room);
+    for (const id of ['entry-name', 'player-name', 'save-name']) element(id).disabled = locked;
+    text('save-name', model.pending?.type === 'set_name' ? 'Saving…' : 'Save Name');
     const setupParent = element(model.room ? 'switch-setup' : 'entry');
     if (element('setup').parentElement !== setupParent) setupParent.append(element('setup'));
     for (const id of ['create', 'join', 'room-code', 'start', 'next']) element(id).disabled = locked;
@@ -393,7 +428,7 @@
         const li = node('li', '');
         const row = node('div', '', 'row');
         const status = !Object.hasOwn(game.favors, id) ? 'Left' : !game.players.includes(id) ? Object.hasOwn(game.discards, id) ? 'Out' : 'Watching' : active && game.currentPlayer === id ? 'Their turn' : '';
-        row.append(node('strong', `${who(id)}${status ? ` · ${id === model.clientId && status === 'Their turn' ? 'Your turn' : status}` : ''}${game.protected.includes(id) ? ' · Protected' : ''}`));
+        row.append(node('strong', `${id === model.clientId ? `${playerName(id, '', model.names)} (You)` : who(id)}${status ? ` · ${id === model.clientId && status === 'Their turn' ? 'Your turn' : status}` : ''}${game.protected.includes(id) ? ' · Protected' : ''}`));
         const award = model.result?.awards[id];
         row.append(node('span', Object.hasOwn(game.favors, id) ? `${game.favors[id]} ${game.favors[id] === 1 ? 'favor' : 'favors'}${award ? ` (+${award})` : ''}` : '', 'score'));
         li.append(row, node('p', game.discards[id]?.length ? `Played / discarded: ${game.discards[id].map(cardName).join(', ')}` : 'No cards played.', 'muted'));
@@ -411,9 +446,23 @@
     const previousRoom = model.room;
     const previousTurn = model.game?.currentPlayer;
     const previousStatus = model.game?.status;
-    try { receive(model, JSON.parse(event.data)); }
-    catch { model.error = 'Could not read the game update. Refresh to reconnect.'; model.connected = false; socket.close(); }
+    const focused = document.activeElement;
+    const focusParent = focused.parentElement;
+    const focusIndex = focusParent ? [...focusParent.children].indexOf(focused) : -1;
+    let nameUpdate = false;
+    try {
+      const message = JSON.parse(event.data);
+      nameUpdate = ['player_names', 'name_updated'].includes(message.type);
+      receive(model, message);
+      if (['room_joined', 'name_updated'].includes(message.type)) {
+        element('entry-name').value = model.name;
+        element('player-name').value = model.name;
+        text('name-status', message.type === 'name_updated' ? 'Name saved.' : '');
+      }
+    } catch { model.error = 'Could not read the game update. Refresh to reconnect.'; model.connected = false; socket.close(); }
     render();
+    if (nameUpdate && !focused.isConnected && ['hand', 'chancellor-cards'].includes(focusParent?.id))
+      focusParent.children[focusIndex]?.focus({ preventScroll: true });
     if (model.room !== previousRoom) { element('switch-room').open = false; element('room-code').value = ''; }
     if (model.game?.status === 'finished' && previousStatus !== 'finished') element('result-title').focus();
     else if (model.game?.currentPlayer === model.clientId && previousTurn !== model.clientId) element('turn').focus();
@@ -427,9 +476,10 @@
   }
   socket.addEventListener('error', disconnected);
   socket.addEventListener('close', disconnected);
-  element('create').addEventListener('click', () => request('create_room'));
+  element('create').addEventListener('click', () => request('create_room', { name: model.room ? model.name : element('entry-name').value }));
+  element('name-form').addEventListener('submit', event => { event.preventDefault(); text('name-status', ''); request('set_name', { name: element('player-name').value }); });
   element('room-code').addEventListener('input', event => { event.target.value = event.target.value.toUpperCase(); });
-  element('join-form').addEventListener('submit', event => { event.preventDefault(); request('join_room', { room: element('room-code').value }); });
+  element('join-form').addEventListener('submit', event => { event.preventDefault(); request('join_room', { room: element('room-code').value, name: model.room ? model.name : element('entry-name').value }); });
   for (const id of ['start', 'next']) element(id).addEventListener('click', () => action('start_game'));
   for (const id of ['target', 'guess']) element(id).addEventListener('change', renderPlay);
   element('play-form').addEventListener('submit', event => {

@@ -2,6 +2,43 @@
 #include "crow/app.h"
 
 #include <random>
+#include <vector>
+
+namespace {
+bool normalizeName(const crow::json::rvalue& value, std::string& name) {
+    if (value.t() != crow::json::type::String) return false;
+    const std::string input = value.s();
+    std::vector<std::pair<std::size_t, unsigned>> points;
+    for (std::size_t i = 0; i < input.size();) {
+        const auto start = i;
+        unsigned cp = static_cast<unsigned char>(input[i++]);
+        const int extra = cp < 0x80 ? 0 : cp >= 0xc2 && cp <= 0xdf ? 1 :
+            cp >= 0xe0 && cp <= 0xef ? 2 : cp >= 0xf0 && cp <= 0xf4 ? 3 : -1;
+        if (extra < 0 || i + extra > input.size()) return false;
+        cp &= extra == 0 ? 0x7f : (1u << (6 - extra)) - 1;
+        for (int j = 0; j < extra; ++j) {
+            const unsigned next = static_cast<unsigned char>(input[i++]);
+            if ((next & 0xc0) != 0x80) return false;
+            cp = (cp << 6) | (next & 0x3f);
+        }
+        if ((extra == 1 && cp < 0x80) || (extra == 2 && cp < 0x800) ||
+            (extra == 3 && cp < 0x10000) || cp > 0x10ffff ||
+            (cp >= 0xd800 && cp <= 0xdfff) || cp < 0x20 || (cp >= 0x7f && cp <= 0x9f)) return false;
+        points.emplace_back(start, cp);
+    }
+    const auto whitespace = [](unsigned cp) {
+        return cp == 0x20 || cp == 0xa0 || cp == 0x1680 || (cp >= 0x2000 && cp <= 0x200a) ||
+            cp == 0x2028 || cp == 0x2029 || cp == 0x202f || cp == 0x205f || cp == 0x3000 || cp == 0xfeff;
+    };
+    std::size_t first = 0, last = points.size();
+    while (first < last && whitespace(points[first].second)) ++first;
+    while (last > first && whitespace(points[last - 1].second)) --last;
+    if (last - first > 32) return false;
+    name = first == last ? "" : input.substr(points[first].first,
+        (last == points.size() ? input.size() : points[last].first) - points[first].first);
+    return true;
+}
+}
 
 void Server::leaveRoom(Client& client) {
     if (client.room.empty()) return;
@@ -39,7 +76,21 @@ void Server::handleMessage(Connection& connection, const std::string& text, bool
         return;
     }
     const std::string type = message["type"].s();
-    if (type == "create_room" || type == "join_room") {
+    if (type == "set_name") {
+        std::string name;
+        if (!message.has("name") || !normalizeName(message["name"], name)) {
+            error("Use a name of up to 32 characters without control characters.");
+            return;
+        }
+        client.name = name;
+        connection.send_text(Json{{"type", "name_updated"}, {"name", name}}.dump());
+        if (!client.room.empty()) rooms_.at(client.room).setName(client.id, name);
+    } else if (type == "create_room" || type == "join_room") {
+        std::string name = client.name;
+        if (message.has("name") && !normalizeName(message["name"], name)) {
+            error("Use a name of up to 32 characters without control characters.");
+            return;
+        }
         std::string room;
         if (type == "create_room") {
             room = createRoomCode();
@@ -64,7 +115,9 @@ void Server::handleMessage(Connection& connection, const std::string& text, bool
             client.room = room;
             rooms_.at(room).addClient(client.id, connection);
         }
-        connection.send_text(Json{{"type", "room_joined"}, {"room", room}}.dump());
+        client.name = name;
+        connection.send_text(Json{{"type", "room_joined"}, {"room", room}, {"name", name}}.dump());
+        rooms_.at(room).setName(client.id, name);
     } else if (type == "broadcast" || type == "server_message") {
         if (!message.has("data")) {
             error("Expected a data field containing any JSON value.");

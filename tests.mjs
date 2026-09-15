@@ -28,8 +28,9 @@ async function until(check, description) {
 async function connect() {
   const socket = new WebSocket('ws://127.0.0.1:8080/ws');
   const messages = [];
+  const nameUpdates = [];
   const peer = {
-    socket, messages,
+    socket, messages, nameUpdates,
     send(type, fields = {}) { socket.send(JSON.stringify({ ...fields, type })); },
     async next(type) {
       await until(() => messages.length > 0, `waiting for ${type}`);
@@ -43,7 +44,10 @@ async function connect() {
     },
   };
   peers.push(peer);
-  socket.addEventListener('message', event => messages.push(JSON.parse(event.data)));
+  socket.addEventListener('message', event => {
+    const message = JSON.parse(event.data);
+    (message.type === 'player_names' ? nameUpdates : messages).push(message);
+  });
   peer.id = (await peer.next('welcome')).clientId;
   return peer;
 }
@@ -176,6 +180,9 @@ async function readUpdate(game, context = {}) {
 async function playTurn(game, preferred = 'held') {
   const peer = game.viewers.find(peer => peer.id === game.state.currentPlayer);
   if (game.state.phase === 'chancellor') {
+    peer.send('set_name', { name: 'Chancellor 王' });
+    await peer.next('name_updated');
+    await until(() => game.viewers.every(viewer => viewer.nameUpdates.at(-1).names[peer.id] === 'Chancellor 王'), 'rename during Chancellor');
     action(peer, 'resolve_chancellor', { keep: 0, bottom: game.choice.slice(1).map((_, i) => i + 1).reverse() });
     await readUpdate(game, { actor: peer.id });
     return;
@@ -228,10 +235,10 @@ try {
 
   a.send('broadcast', { data: 'too early' });
   await a.next('error');
-  a.send('create_room');
+  a.send('create_room', { name: ' Alice ' });
   const room = (await a.next('room_joined')).room;
   assert.match(room, /^[A-HJ-NP-Z2-9]{6}$/);
-  b.send('join_room', { room });
+  b.send('join_room', { room, name: 'Bob' });
   assert.equal((await b.next('room_joined')).room, room);
   b.send('join_room', { room }); // Joining the same room is harmless.
   await b.next('room_joined');
@@ -240,6 +247,29 @@ try {
   assert.notEqual(room, otherRoom);
   c.send('join_room', { room: otherRoom }); // Rejoining as the sole member preserves the room.
   assert.equal((await c.next('room_joined')).room, otherRoom);
+
+  await until(() => b.nameUpdates.length >= 2 && c.nameUpdates.length >= 2, 'initial name maps');
+  assert.equal(b.nameUpdates.at(-1).names[a.id], 'Alice');
+  const isolatedCount = c.nameUpdates.length;
+  a.send('set_name', { name: '  Zoë 王😀  ' });
+  assert.equal((await a.next('name_updated')).name, 'Zoë 王😀');
+  await until(() => b.nameUpdates.at(-1).names[a.id] === 'Zoë 王😀', 'room rename');
+  assert.equal(c.nameUpdates.length, isolatedCount);
+  for (const name of [42, null, 'x'.repeat(33), 'bad\nname', '\u007f', '\u0085', '\ud800']) {
+    a.send('set_name', { name });
+    await a.next('error');
+  }
+  a.send('set_name');
+  await a.next('error');
+  a.send('create_room', { name: 'x'.repeat(33) });
+  await a.next('error');
+  a.send('join_room', { room: otherRoom, name: 42 });
+  await a.next('error');
+  for (const name of ['😀'.repeat(32), '<b>Alice</b>', '']) {
+    a.send('set_name', { name });
+    assert.equal((await a.next('name_updated')).name, name);
+    await until(() => b.nameUpdates.at(-1).names[a.id] === (name || `Player ${a.id}`), 'accepted name');
+  }
 
   a.send('server_message', { data: { room, action: 'first room' } });
   c.send('server_message', { data: { room: otherRoom, action: 'second room' } });
@@ -281,6 +311,8 @@ try {
 
   b.send('join_room', { room: otherRoom });
   await b.next('room_joined');
+  await until(() => b.nameUpdates.at(-1).room === otherRoom, 'names after switching');
+  assert.equal(b.nameUpdates.at(-1).names[b.id], 'Bob');
   b.send('server_message', { data: { afterSwitching: true } });
   assert.deepEqual(await b.next('server_reply'), {
     type: 'server_reply', sender: 'server', data: { afterSwitching: true },
@@ -326,6 +358,9 @@ try {
   spectator.send('join_room', { room: gameRoom });
   assert.deepEqual(await spectator.next('game_state'), { ...game.state, favors: { ...game.state.favors, [spectator.id]: 0 } });
   await spectator.next('room_joined');
+  spectator.send('set_name', { name: 'Watcher' });
+  await spectator.next('name_updated');
+  await until(() => players[0].nameUpdates.at(-1).names[spectator.id] === 'Watcher', 'spectator rename');
   game.viewers.push(spectator);
   spectator.send('join_room', { room: gameRoom });
   await spectator.next('room_joined'); // No duplicate seat or draw.
@@ -363,6 +398,9 @@ try {
 
   // A waiting player leaves; the current player's draw and turn remain intact.
   const originalHand = { ...players[0].hand };
+  players[1].send('set_name', { name: 'Departing player' });
+  await players[1].next('name_updated');
+  await until(() => players[0].nameUpdates.at(-1).names[players[1].id] === 'Departing player', 'name before departure');
   players[1].send('create_room');
   await players[1].next('room_joined');
   game.viewers = game.viewers.filter(peer => peer !== players[1]);
@@ -370,6 +408,7 @@ try {
   assert.equal(game.state.currentPlayer, players[0].id);
   assert.deepEqual(players[0].hand, originalHand);
   assert.ok(!Object.hasOwn(game.state.favors, players[1].id));
+  assert.equal(players[0].nameUpdates.at(-1).names[players[1].id], 'Departing player');
 
   // The current player disconnects; the next survivor draws exactly once.
   const beforeLeave = game.state.cardsRemaining;

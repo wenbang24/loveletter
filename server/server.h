@@ -14,6 +14,7 @@ class Server {
     struct Client {
         std::string id;
         std::string room;
+        std::string name;
     };
 
     void        handleMessage(Connection& connection, const std::string& text, bool binary);
